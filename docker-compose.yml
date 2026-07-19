@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  flir_app:
+    build: .
+    container_name: flir_server
+    ports:
+      - "5050:5050"
+    volumes:
+      # Data persistence mapping
+      - ./data:/app/data
+      - ./uploads:/app/static/uploads
+      - ./processed:/app/static/processed
+      - ./models:/app/models
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Taipei

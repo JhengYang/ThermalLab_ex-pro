@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FLIR Thermal Analyzer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+    <header>
+        <div class="logo">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"></path>
+            </svg>
+            FLIR Thermal Analyzer
+        </div>
+        <div class="nav-tabs">
+            <button class="tab-btn active" data-target="analysis-tab">📷 Analysis</button>
+            <button class="tab-btn" data-target="export-tab">📊 Data Export</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Analysis Tab -->
+        <div id="analysis-tab" class="tab-content active">
+            <div class="analysis-layout">
+                <!-- Left Panel -->
+                <div class="left-panel glass p-6">
+                    <div class="upload-container">
+                        <div class="drop-zone" id="drop-rgb">
+                            <input type="file" id="file-rgb" accept="image/*">
+                            <img class="preview-img" id="preview-rgb" src="" alt="RGB Preview">
+                            <div class="drop-zone-title">RGB Image</div>
+                            <div class="drop-zone-text">Drag & drop or click to upload</div>
+                        </div>
+                        <div class="drop-zone" id="drop-thermal">
+                            <input type="file" id="file-thermal" accept="image/*">
+                            <img class="preview-img" id="preview-thermal" src="" alt="Thermal Preview">
+                            <div class="drop-zone-title">Thermal Image</div>
+                            <div class="drop-zone-text">Drag & drop or click to upload</div>
+                        </div>
+                    </div>
+                    
+                    <button id="btn-process" class="btn btn-primary mt-4">
+                        <div class="spinner"></div>
+                        Process & Align
+                    </button>
+
+                    <div class="form-section mt-4 pt-4 border-t border-card-border">
+                        <h3 class="mb-3 text-sm text-text-secondary">Parameters</h3>
+                        <div class="form-group">
+                            <label for="param-k">隨機取樣點數 (k)</label>
+                            <input type="number" id="param-k" value="5" min="1" max="50">
+                        </div>
+                        <div class="form-group">
+                            <label for="param-annotation">註解名稱</label>
+                            <input type="text" id="param-annotation" placeholder="e.g. sample_A">
+                        </div>
+                        <div class="form-group">
+                            <label for="param-experiment">實驗名稱</label>
+                            <input type="text" id="param-experiment" placeholder="e.g. Exp_001">
+                        </div>
+                        <div class="form-group">
+                            <label for="param-time">實驗時間</label>
+                            <input type="datetime-local" id="param-time">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Panel -->
+                <div class="right-panel">
+                    <div class="image-display glass">
+                        <div class="image-tabs">
+                            <button class="img-tab-btn active" data-img="rgb">RGB</button>
+                            <button class="img-tab-btn" data-img="thermal">Thermal</button>
+                            <button class="img-tab-btn" data-img="edge">Edge Detection</button>
+                            <button class="img-tab-btn" data-img="aligned">Aligned Overlay</button>
+                        </div>
+                        <div class="image-container" id="image-container">
+                            <img id="display-rgb" class="main-image active" src="" alt="RGB">
+                            <img id="display-thermal" class="main-image" src="" alt="Thermal">
+                            <img id="display-edge" class="main-image" src="" alt="Edge">
+                            <img id="display-aligned" class="main-image" src="" alt="Aligned">
+                            <canvas id="roi-canvas"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="action-buttons flex gap-2">
+                        <button id="btn-analyze" class="btn btn-secondary flex-1" disabled>
+                            <div class="spinner"></div>
+                            Analyze ROI
+                        </button>
+                        <button id="btn-save" class="btn btn-outline flex-1" disabled>
+                            Save to Database
+                        </button>
+                    </div>
+
+                    <!-- Results Panel -->
+                    <div id="results-panel" class="results-panel glass p-4" style="display: none;">
+                        <div class="result-images">
+                            <div class="mini-img-card">
+                                <div class="text-sm text-text-secondary">Background Removed ROI</div>
+                                <img id="res-roi-img" src="" alt="ROI">
+                            </div>
+                            <div class="mini-img-card">
+                                <div class="text-sm text-text-secondary">Aligned RGB (BG Removed)</div>
+                                <img id="res-rgb-fg-img" src="" alt="RGB Foreground">
+                            </div>
+                            <div class="mini-img-card">
+                                <div class="text-sm text-text-secondary">Foreground Mask</div>
+                                <img id="res-mask-img" src="" alt="Mask">
+                            </div>
+                        </div>
+                        
+                        <div class="result-data flex flex-col gap-4">
+                            <div class="table-container">
+                                <table id="samples-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Point</th>
+                                            <th>X</th>
+                                            <th>Y</th>
+                                            <th>Temp (°C)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Populated via JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <div class="stats-grid">
+                                <div class="stat-card">
+                                    <div class="stat-value" id="stat-min">--</div>
+                                    <div class="stat-label">Min</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value" id="stat-max">--</div>
+                                    <div class="stat-label">Max</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value" id="stat-mean">--</div>
+                                    <div class="stat-label">Mean</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value" id="stat-std">--</div>
+                                    <div class="stat-label">Std</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Export Tab -->
+        <div id="export-tab" class="tab-content">
+            <div class="glass p-6 mb-6">
+                <h2 class="mb-4">Data Export Filter</h2>
+                <div class="flex gap-4 items-end">
+                    <div class="form-group flex-1 m-0">
+                        <label for="filter-experiment">Experiment Name</label>
+                        <input type="text" id="filter-experiment" list="experiment-list">
+                        <datalist id="experiment-list"></datalist>
+                    </div>
+                    <div class="form-group flex-1 m-0">
+                        <label for="filter-date-from">Date From</label>
+                        <input type="date" id="filter-date-from">
+                    </div>
+                    <div class="form-group flex-1 m-0">
+                        <label for="filter-date-to">Date To</label>
+                        <input type="date" id="filter-date-to">
+                    </div>
+                    <button id="btn-search" class="btn btn-primary w-auto">Search</button>
+                </div>
+            </div>
+
+            <div class="glass p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2>Results</h2>
+                    <div class="flex gap-2">
+                        <button id="btn-export-csv" class="btn btn-outline py-1 px-3 text-sm">Export CSV</button>
+                        <button id="btn-export-json" class="btn btn-outline py-1 px-3 text-sm">Export JSON</button>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table id="export-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Experiment</th>
+                                <th>Annotation</th>
+                                <th>Point</th>
+                                <th>X</th>
+                                <th>Y</th>
+                                <th>Temp (°C)</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Populated via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toast-container"></div>
+
+    <script>
+        // Utilities
+        const $ = id => document.getElementById(id);
+        const $$ = selector => document.querySelectorAll(selector);
+
+        function showToast(message, type = 'success') {
+            const container = $('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // Tab Switching
+        $$('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                $$('.tab-btn').forEach(b => b.classList.remove('active'));
+                $$('.tab-content').forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                $(btn.dataset.target).classList.add('active');
+            });
+        });
+
+        // Image Tab Switching
+        $$('.img-tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                $$('.img-tab-btn').forEach(b => b.classList.remove('active'));
+                $$('.main-image').forEach(img => img.classList.remove('active'));
+                btn.classList.add('active');
+                $(`display-${btn.dataset.img}`).classList.add('active');
+                resizeCanvas();
+            });
+        });
+
+        // File Upload Handling
+        const files = { rgb: null, thermal: null };
+
+        function setupDropZone(id, type) {
+            const zone = $(`drop-${type}`);
+            const input = $(`file-${type}`);
+            const preview = $(`preview-${type}`);
+
+            zone.addEventListener('click', () => input.click());
+            
+            zone.addEventListener('dragover', e => {
+                e.preventDefault();
+                zone.classList.add('dragover');
+            });
+
+            zone.addEventListener('dragleave', () => {
+                zone.classList.remove('dragover');
+            });
+
+            zone.addEventListener('drop', e => {
+                e.preventDefault();
+                zone.classList.remove('dragover');
+                if (e.dataTransfer.files.length) {
+                    handleFile(e.dataTransfer.files[0], type, preview);
+                }
+            });
+
+            input.addEventListener('change', () => {
+                if (input.files.length) {
+                    handleFile(input.files[0], type, preview);
+                }
+            });
+        }
+
+        function handleFile(file, type, previewEl) {
+            files[type] = file;
+            const reader = new FileReader();
+            reader.onload = e => {
+                previewEl.src = e.target.result;
+                previewEl.classList.add('show');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        setupDropZone('drop-rgb', 'rgb');
+        setupDropZone('drop-thermal', 'thermal');
+
+        // Set default time to now
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        $('param-time').value = now.toISOString().slice(0,16);
+
+        // Process Images
+        $('btn-process').addEventListener('click', async (e) => {
+            if (!files.rgb || !files.thermal) {
+                return showToast('Please upload both RGB and Thermal images.', 'error');
+            }
+
+            const btn = e.currentTarget;
+            btn.classList.add('loading');
+            btn.disabled = true;
+
+            const formData = new FormData();
+            formData.append('rgb_image', files.rgb);
+            formData.append('thermal_image', files.thermal);
+
+            try {
+                // Mock API or real API
+                const res = await fetch('/api/process', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!res.ok) throw new Error('Processing failed');
+                
+                const data = await res.json();
+                if (data.error) throw new Error(data.error);
+
+                window._sessionId = data.session_id;
+                window._thermalShape = data.thermal_shape;
+                
+                $('display-rgb').src = data.rgb_url;
+                $('display-thermal').src = data.thermal_url;
+                $('display-edge').src = data.edge_colored_url || data.edge_url;
+                $('display-aligned').src = data.overlay_url;
+                
+                // Show first tab
+                $$('.img-tab-btn')[0].click();
+                
+                showToast(data.message || 'Images processed and aligned successfully.');
+                $('btn-analyze').disabled = false;
+                
+                // Wait for image to load to resize canvas
+                $('display-rgb').onload = resizeCanvas;
+
+            } catch (err) {
+                showToast(err.message, 'error');
+            } finally {
+                btn.classList.remove('loading');
+                btn.disabled = false;
+            }
+        });
+
+        // ROI Canvas Logic
+        const canvas = $('roi-canvas');
+        const ctx = canvas.getContext('2d');
+        const imgContainer = $('image-container');
+        let isDrawing = false;
+        let startX, startY;
+        let roiRect = null; // {x, y, w, h} in canvas coordinates
+
+        function resizeCanvas() {
+            const activeImg = document.querySelector('.main-image.active');
+            if (activeImg && activeImg.src) {
+                canvas.width = activeImg.clientWidth;
+                canvas.height = activeImg.clientHeight;
+                
+                // Position canvas exactly over the image
+                const containerRect = imgContainer.getBoundingClientRect();
+                const imgRect = activeImg.getBoundingClientRect();
+                
+                canvas.style.left = `${imgRect.left - containerRect.left}px`;
+                canvas.style.top = `${imgRect.top - containerRect.top}px`;
+                
+                drawROI();
+            }
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+
+        canvas.addEventListener('mousedown', e => {
+            isDrawing = true;
+            const rect = canvas.getBoundingClientRect();
+            startX = e.clientX - rect.left;
+            startY = e.clientY - rect.top;
+            roiRect = null;
+        });
+
+        canvas.addEventListener('mousemove', e => {
+            if (!isDrawing) return;
+            const rect = canvas.getBoundingClientRect();
+            const currentX = e.clientX - rect.left;
+            const currentY = e.clientY - rect.top;
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            const w = currentX - startX;
+            const h = currentY - startY;
+            
+            ctx.strokeStyle = '#00d4aa';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.fillStyle = 'rgba(0, 212, 170, 0.2)';
+            
+            ctx.beginPath();
+            ctx.rect(startX, startY, w, h);
+            ctx.fill();
+            ctx.stroke();
+        });
+
+        canvas.addEventListener('mouseup', e => {
+            if (!isDrawing) return;
+            isDrawing = false;
+            const rect = canvas.getBoundingClientRect();
+            const endX = e.clientX - rect.left;
+            const endY = e.clientY - rect.top;
+            
+            roiRect = {
+                x: Math.min(startX, endX),
+                y: Math.min(startY, endY),
+                w: Math.abs(endX - startX),
+                h: Math.abs(endY - startY)
+            };
+            
+            drawROI();
+        });
+
+        function drawROI() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (roiRect && roiRect.w > 0 && roiRect.h > 0) {
+                ctx.strokeStyle = '#00d4aa';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                ctx.fillStyle = 'rgba(0, 212, 170, 0.2)';
+                
+                ctx.beginPath();
+                ctx.rect(roiRect.x, roiRect.y, roiRect.w, roiRect.h);
+                ctx.fill();
+                ctx.stroke();
+
+                // Draw coords text
+                ctx.fillStyle = '#fff';
+                ctx.font = '12px Inter';
+                ctx.fillText(`(${Math.round(roiRect.x)}, ${Math.round(roiRect.y)}) ${Math.round(roiRect.w)}x${Math.round(roiRect.h)}`, roiRect.x, roiRect.y - 5);
+            }
+        }
+
+        // Analyze ROI
+        let lastAnalysisData = null;
+
+        $('btn-analyze').addEventListener('click', async (e) => {
+            if (!roiRect) return showToast('Please draw an ROI first.', 'error');
+            
+            const btn = e.currentTarget;
+            btn.classList.add('loading');
+            
+            // Convert canvas coordinates to original image coordinates
+            const activeImg = document.querySelector('.main-image.active');
+            const scaleX = window._thermalShape ? window._thermalShape[1] / activeImg.clientWidth : 1;
+            const scaleY = window._thermalShape ? window._thermalShape[0] / activeImg.clientHeight : 1;
+
+            const payload = {
+                session_id: window._sessionId,
+                roi: {
+                    x: Math.round(roiRect.x * scaleX),
+                    y: Math.round(roiRect.y * scaleY),
+                    width: Math.round(roiRect.w * scaleX),
+                    height: Math.round(roiRect.h * scaleY)
+                },
+                k: parseInt($('param-k').value),
+                annotation_name: $('param-annotation').value || 'sample',
+                experiment_name: $('param-experiment').value || 'unnamed',
+                experiment_time: $('param-time').value
+            };
+
+            try {
+                const res = await fetch('/api/analyze_roi', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (data.error) throw new Error(data.error);
+                
+                lastAnalysisData = { ...data, ...payload };
+                
+                // Display results
+                $('results-panel').style.display = 'grid';
+                $('res-roi-img').src = data.roi_image_url;
+                $('res-mask-img').src = data.mask_image_url;
+                
+                // Display aligned RGB foreground if available
+                const rgbFgCard = $('res-rgb-fg-img').closest('.mini-img-card');
+                if (data.roi_rgb_fg_url) {
+                    $('res-rgb-fg-img').src = data.roi_rgb_fg_url;
+                    rgbFgCard.style.display = '';
+                } else {
+                    rgbFgCard.style.display = 'none';
+                }
+                
+                // Populate Table
+                const tbody = document.querySelector('#samples-table tbody');
+                tbody.innerHTML = '';
+                data.samples.forEach(s => {
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${s.label}</td>
+                            <td>${s.x}</td>
+                            <td>${s.y}</td>
+                            <td>${s.temperature.toFixed(2)}</td>
+                        </tr>
+                    `;
+                });
+                
+                // Populate Stats
+                $('stat-min').textContent = data.stats.min.toFixed(2);
+                $('stat-max').textContent = data.stats.max.toFixed(2);
+                $('stat-mean').textContent = data.stats.mean.toFixed(2);
+                $('stat-std').textContent = data.stats.std.toFixed(2);
+                
+                $('btn-save').disabled = false;
+                showToast('Analysis complete.');
+
+            } catch (err) {
+                showToast(err.message, 'error');
+            } finally {
+                btn.classList.remove('loading');
+            }
+        });
+
+        // Save
+        $('btn-save').addEventListener('click', async (e) => {
+            if (!lastAnalysisData) return showToast('Please analyze ROI first.', 'error');
+            const payload = {
+                session_id: window._sessionId,
+                roi: lastAnalysisData.roi,
+                k: lastAnalysisData.k,
+                annotation_name: lastAnalysisData.annotation_name,
+                experiment_name: lastAnalysisData.experiment_name,
+                experiment_time: lastAnalysisData.experiment_time,
+                samples: lastAnalysisData.samples,
+                stats: lastAnalysisData.stats
+            };
+
+            try {
+                const res = await fetch('/api/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await res.json();
+                if (result.error) throw new Error(result.error);
+                showToast(result.message || 'Saved to database successfully!');
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        });
+
+        // Export Search
+        $('btn-search').addEventListener('click', async () => {
+            const exp = $('filter-experiment').value;
+            const from = $('filter-date-from').value;
+            const to = $('filter-date-to').value;
+            
+            const params = new URLSearchParams();
+            if (exp) params.append('experiment_name', exp);
+            if (from) params.append('date_from', from);
+            if (to) params.append('date_to', to);
+            
+            try {
+                const res = await fetch(`/api/export?${params.toString()}`);
+                if (!res.ok) throw new Error('Search failed');
+                const result = await res.json();
+                if (result.error) throw new Error(result.error);
+                const rows = result.data || [];
+                
+                const tbody = document.querySelector('#export-table tbody');
+                tbody.innerHTML = '';
+                if (rows.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;opacity:0.5">No data found</td></tr>';
+                } else {
+                    rows.forEach(row => {
+                        tbody.innerHTML += `
+                            <tr>
+                                <td>${row.id || '-'}</td>
+                                <td>${row.experiment_name || '-'}</td>
+                                <td>${row.annotation_name || '-'}</td>
+                                <td>${row.point_label || '-'}</td>
+                                <td>${row.x != null ? row.x : '-'}</td>
+                                <td>${row.y != null ? row.y : '-'}</td>
+                                <td>${row.temperature != null ? Number(row.temperature).toFixed(2) : '-'}</td>
+                                <td>${row.experiment_time || '-'}</td>
+                            </tr>
+                        `;
+                    });
+                }
+                showToast(`Found ${rows.length} records.`);
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        });
+
+        // Fetch experiments for datalist on load
+        fetch('/api/experiments').then(r => r.json()).then(result => {
+            const list = $('experiment-list');
+            (result.experiments || []).forEach(exp => {
+                const option = document.createElement('option');
+                option.value = exp;
+                list.appendChild(option);
+            });
+        }).catch(() => {});
+
+        // Export Actions
+        $('btn-export-csv').addEventListener('click', () => {
+            const exp = $('filter-experiment').value;
+            const from = $('filter-date-from').value;
+            const to = $('filter-date-to').value;
+            const params = new URLSearchParams({ format: 'csv' });
+            if (exp) params.append('experiment_name', exp);
+            if (from) params.append('date_from', from);
+            if (to) params.append('date_to', to);
+            window.location.href = `/api/export?${params.toString()}`;
+        });
+
+        $('btn-export-json').addEventListener('click', () => {
+            const exp = $('filter-experiment').value;
+            const from = $('filter-date-from').value;
+            const to = $('filter-date-to').value;
+            const params = new URLSearchParams({ format: 'json', download: '1' });
+            if (exp) params.append('experiment_name', exp);
+            if (from) params.append('date_from', from);
+            if (to) params.append('date_to', to);
+            window.location.href = `/api/export?${params.toString()}`;
+        });
+
+    </script>
+</body>
+</html>

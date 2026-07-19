@@ -1,0 +1,51 @@
+# Environment and cache
+venv/
+env/
+.env
+.venv
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Database and Data
+*.db
+*.sqlite3
+data/
+app/data/
+flir_data.db
+
+# Uploads and Processed files
+app/static/uploads/*
+app/static/processed/*
+uploads/
+processed/
+!app/static/uploads/.gitkeep
+!app/static/processed/.gitkeep
+
+# AI Models
+models/
+app/models/
+*.onnx
+.u2net/
+
+# Mac / Windows OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Docker
+.docker/
