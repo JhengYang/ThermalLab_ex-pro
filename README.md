@@ -5,7 +5,7 @@
 [![Docker Pulls](https://img.shields.io/docker/pulls/yourusername/flir-thermal-analyzer)](https://hub.docker.com/r/yourusername/flir-thermal-analyzer)
 [![CI](https://github.com/yourusername/flir-thermal-analyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/yourusername/flir-thermal-analyzer/actions)
 
-> A powerful Flask-based web application for advanced processing, alignment, and analysis of FLIR thermal camera images.
+> Open-source thermal imaging analysis toolkit for FLIR cameras with RGB-thermal alignment, AI segmentation, and temperature measurement.
 
 ## Overview
 
